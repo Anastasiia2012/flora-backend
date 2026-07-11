@@ -1,57 +1,60 @@
 'use strict';
 
-const express  = require('express');
-const cors     = require('cors');
-const morgan   = require('morgan');
-const path     = require('path');
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
 
 const { corsOrigin, nodeEnv } = require('./envConfigs');
-const { ROUTES }    = require('./constants/routes');
-const apiRouter     = require('./routes/api');
+const { ROUTES } = require('./constants/routes');
+const apiRouter = require('./routes/api');
 const { notFound, errorHandler } = require('./middlewares');
 
 const app = express();
 
-/* ─── CORS ────────────────────────────────────────────────── */
-const allowedOrigins = corsOrigin === '*' ? '*' : corsOrigin.split(',').map((o) => o.trim());
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+/* ─── Global middleware ───────────────────────────────────── */
 
-/* ─── Body parsers ────────────────────────────────────────── */
+// CORS — allow the GitHub Pages / localhost frontend to call this API.
+const allowedOrigins =
+  corsOrigin === '*' ? '*' : corsOrigin.split(',').map((o) => o.trim());
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
+
+// Parse JSON & url-encoded bodies.
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-/* ─── Logging ─────────────────────────────────────────────── */
-if (nodeEnv !== 'production') app.use(morgan('dev'));
-
-/* ─── Static files (Block 4) ──────────────────────────────── */
-app.use(express.static(path.join(__dirname, 'public')));
+// Request logging (skip noise in test/production if desired).
+if (nodeEnv !== 'production') {
+  app.use(morgan('dev'));
+}
 
 /* ─── Routes ──────────────────────────────────────────────── */
-app.get('/', (_req, res) =>
+
+// Friendly root so hitting "/" in a browser isn't a 404.
+app.get('/', (req, res) => {
   res.json({
     service: 'flora-backend',
     message: 'Flora REST API is running',
-    docs:    `${ROUTES.API_BASE}${ROUTES.DOCS}`,
     endpoints: [
-      `GET  ${ROUTES.API_BASE}${ROUTES.BOUQUETS}`,
-      `GET  ${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id`,
-      `POST ${ROUTES.API_BASE}${ROUTES.BOUQUETS}`,
-      `PUT  ${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id`,
-      `DELETE ${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id`,
-      `PATCH ${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id/favorite`,
-      `PATCH ${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id/photo`,
+      `${ROUTES.API_BASE}${ROUTES.HEALTH}`,
+      `${ROUTES.API_BASE}${ROUTES.BOUQUETS}`,
+      `${ROUTES.API_BASE}${ROUTES.BOUQUETS}/:id`,
+      `${ROUTES.API_BASE}${ROUTES.CATEGORIES}`,
     ],
-  }),
-);
+  });
+});
 
 app.use(ROUTES.API_BASE, apiRouter);
 
 /* ─── Fallbacks ───────────────────────────────────────────── */
-app.use(notFound);
-app.use(errorHandler);
+
+app.use(notFound); // 404 for unmatched routes
+app.use(errorHandler); // central error handler (LAST)
 
 module.exports = app;
